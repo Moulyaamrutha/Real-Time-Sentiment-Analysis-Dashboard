@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Realtime Sentiment Analysis</title>
+
+  <style>
+    :root{
+      --space-xs:6px;--space-sm:12px;--space-md:20px;--space-lg:32px;--container-max:1080px;
+      --font-sans:"IBM Plex Sans", Inter, ui-sans-serif, system-ui;
+      --type-xl:22px;--type-md:16px;--type-sm:13px;
+      --bg:#f2f4f8;--card:#ffffff;--muted:#697077;
+      --primary:#0f62fe;--primary-dark:#0353e9;--accent:#198038;
+      --negative:#da1e28;--neutral:#8d8d8d;
+      --radius:12px;--shadow:0 6px 18px rgba(0,0,0,0.08);
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;padding:var(--space-lg);
+      background:var(--bg);
+      font-family:var(--font-sans);
+      display:flex;justify-content:center;
+      color:#161616;
+    }
+
+    .wrap{width:100%;max-width:var(--container-max)}
+
+    header{
+      display:flex;justify-content:space-between;
+      align-items:center;margin-bottom:var(--space-lg);
+      flex-wrap:wrap;gap:var(--space-md);
+    }
+
+    .brand{
+      display:flex;gap:14px;align-items:center;
+    }
+
+    .logo{
+      width:48px;height:48px;border-radius:10px;
+      background:var(--primary);
+      display:flex;align-items:center;justify-content:center;
+      font-size:20px;color:white;font-weight:700;
+      box-shadow:var(--shadow);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 340px;
+      gap:var(--space-lg);
+    }
+
+    .card{
+      background:var(--card);
+      padding:var(--space-lg);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+    }
+
+    textarea{
+      width:100%;min-height:150px;padding:14px;
+      font-size:var(--type-md);
+      border-radius:8px;border:1px solid #dde1e6;
+      resize:none;background:white;
+      outline-color:var(--primary);
+    }
+
+    label{font-size:var(--type-sm);color:var(--muted);font-weight:600}
+
+    .btn{
+      padding:10px 16px;border:none;font-size:14px;
+      border-radius:8px;font-weight:600;cursor:pointer;
+      display:flex;align-items:center;gap:8px;
+    }
+
+    .btn-primary{
+      background:var(--primary);color:white;
+      box-shadow:0 4px 10px rgba(15,98,254,0.25);
+    }
+
+    .btn-primary:hover{background:var(--primary-dark)}
+
+    .btn-ghost{
+      background:transparent;border:1px solid #dde1e6;
+      color:var(--primary-dark);
+    }
+
+    .controls{display:flex;gap:12px;margin-top:var(--space-sm);flex-wrap:wrap}
+
+    .chip{
+      padding:8px 16px;border-radius:50px;
+      color:white;font-weight:700;font-size:13px;
+      display:inline-flex;align-items:center;
+    }
+
+    .positive{background:linear-gradient(90deg,#198038,#24a148)}
+    .negative{background:linear-gradient(90deg,#da1e28,#fa4d56)}
+    .neutral{background:linear-gradient(90deg,#6f6f6f,#8d8d8d)}
+
+    .result-box{margin-top:var(--space-md);display:flex;align-items:center;gap:16px}
+
+    .spinner{
+      width:18px;height:18px;border-radius:50%;
+      border:3px solid rgba(255,255,255,0.25);
+      border-top-color:white;
+      animation:spin 1s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* History panel */
+    .history-item{
+      padding:12px;border-radius:10px;
+      border:1px solid #e0e0e0;
+      background:white;margin-bottom:10px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.05);
+      display:flex;justify-content:space-between;gap:10px;
+    }
+
+    .history-text{font-size:14px;color:#393939}
+    .history-time{font-size:12px;color:var(--muted)}
+
+    @media(max-width:900px){
+      .grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="logo">S</div>
+      <div>
+        <h1 style="margin:0;font-size:var(--type-xl);">Realtime Sentiment</h1>
+        <p style="margin:0;color:var(--muted);font-size:var(--type-sm);">
+          Powered by BiLSTM 
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <main class="grid">
+
+    <!-- LEFT PANEL -->
+    <section class="card">
+      <label>Enter text for sentiment analysis</label>
+      <textarea id="text-input" placeholder="Type something..."></textarea>
+
+      <div class="controls">
+        <button id="analyze-btn" class="btn btn-primary">
+          <span id="btn-text">Analyze</span>
+          <span id="btn-spinner" style="display:none" class="spinner"></span>
+        </button>
+
+        <button id="clear-btn" class="btn btn-ghost">Clear</button>
+
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input id="realtime-toggle" type="checkbox" />
+          <span style="font-size:14px;color:var(--muted)">Realtime</span>
+        </label>
+      </div>
+
+      <div class="result-box">
+        <div id="result-chip" class="chip neutral" style="display:none"></div>
+        <div id="result-msg" style="color:var(--muted);font-size:14px;"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT: HISTORY -->
+    <aside class="card">
+      <h3 style="margin-top:0;font-size:18px;">History</h3>
+      <div id="history-list" style="max-height:480px;overflow:auto;margin-top:10px;"></div>
+    </aside>
+
+  </main>
+</div>
+
+<script>
+(function(){
+  const API_URL = "http://127.0.0.1:8000/predict";
+
+  const input = document.getElementById("text-input");
+  const analyzeBtn = document.getElementById("analyze-btn");
+  const clearBtn = document.getElementById("clear-btn");
+  const realtimeToggle = document.getElementById("realtime-toggle");
+  const resultChip = document.getElementById("result-chip");
+  const resultMsg = document.getElementById("result-msg");
+  const btnSpinner = document.getElementById("btn-spinner");
+  const btnText = document.getElementById("btn-text");
+  const historyList = document.getElementById("history-list");
+
+  let debounceTimer = null;
+  let history = [];
+
+  function setLoading(on){
+    analyzeBtn.disabled = on;
+    if(on){
+      btnSpinner.style.display="inline-block";
+      btnText.style.opacity=0;
+    } else {
+      btnSpinner.style.display="none";
+      btnText.style.opacity=1;
+    }
+  }
+
+  function showResult(sentiment){
+    const s = sentiment.toLowerCase();
+    const cls = s.includes("pos") ? "positive" :
+                s.includes("neg") ? "negative" : "neutral";
+
+    resultChip.style.display = "inline-flex";
+    resultChip.className = "chip " + cls;
+    resultChip.textContent = sentiment;
+
+    resultMsg.textContent = "Updated: " + new Date().toLocaleTimeString();
+
+    history.unshift({
+      text: input.value,
+      sentiment,
+      time: new Date().toLocaleString()
+    });
+
+    if(history.length > 20) history.pop();
+    renderHistory();
+  }
+
+  function renderHistory(){
+    historyList.innerHTML = "";
+    history.forEach(h => {
+      const div = document.createElement("div");
+      div.className = "history-item";
+      div.innerHTML = `
+        <div style="flex:1;">
+          <div class="history-text">${escapeHtml(shorten(h.text, 100))}</div>
+          <div class="history-time">${h.time}</div>
+        </div>
+        <div class="chip ${h.sentiment.toLowerCase().includes('pos') ? 'positive' : h.sentiment.toLowerCase().includes('neg') ? 'negative' : 'neutral'}">
+          ${h.sentiment}
+        </div>
+      `;
+      historyList.appendChild(div);
+    });
+  }
+
+  function shorten(t, n){ return t.length>n ? t.substring(0,n)+"…" : t; }
+  function escapeHtml(s){ return s.replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+  async function analyze(text){
+    if(!text.trim()) return;
+    setLoading(true);
+    try{
+      const resp = await fetch(API_URL, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify({ text: text })
+      });
+
+      const data = await resp.json();
+      if(data.sentiment){
+        showResult(data.sentiment);
+      } else {
+        resultMsg.textContent = "Unexpected response";
+      }
+
+    } catch(err){
+      resultChip.style.display="inline-flex";
+      resultChip.className="chip neutral";
+      resultChip.textContent="Error";
+      resultMsg.textContent = "Could not connect to API";
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  analyzeBtn.onclick = () => analyze(input.value);
+  clearBtn.onclick = () => { input.value=""; resultChip.style.display="none"; resultMsg.textContent=""; }
+
+  realtimeToggle.onchange = () => { if(realtimeToggle.checked) schedule(); };
+  input.oninput = () => { if(realtimeToggle.checked) schedule(); };
+
+  function schedule(){
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(()=>analyze(input.value), 600);
+  }
+})();
+</script>
+
+</body>
+</html>
